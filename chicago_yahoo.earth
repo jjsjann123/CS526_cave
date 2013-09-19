@@ -16,6 +16,6 @@
 
     <!-- This image layer returns global geodetic tiles -->
     <image name="yahoo aerial" driver="yahoo">
-        <dataset>satellite</dataset>
+        <dataset>roads</dataset>
     </image>
 </map>

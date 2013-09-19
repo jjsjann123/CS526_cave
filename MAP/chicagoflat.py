@@ -166,7 +166,6 @@ districtBound.setEffect('colored -d blue')
 
 f = open('..\\data\\boundaries')
 boundaries = [row.rstrip('\n') for row in f]
-posArray = []
 count = 10
 for pos in boundaries:
 	xy = pos.partition(',')
@@ -186,7 +185,6 @@ for pos in boundaries:
 			l.setThickness(20.0)
 			oldX = float(result[0])
 			oldY = float(result[1])
-	posArray.append(Vector2(oldX, oldY));
 
 f.close()
 

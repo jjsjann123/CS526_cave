@@ -1,0 +1,6 @@
+create database if not exists crime;
+use crime;
+
+create table if not exists crimeRecord (Date date, Time time, Type varchar(20), Description varchar(100), Community int, Year int, Latitude decimal(10,8), Longitude decimal(10,8));
+
+load data local infile 'c:\\AJ\\omegalib\\apps\\data\\crime\\Crimes_2001.csv' into table crimeRecord fields terminated by ',';

@@ -1,0 +1,7 @@
+omegalib data search paths:
+::: C:\AJ\omegalib\apps
+omegalib application config lookup:
+::: trying orun/orun.cfg
+::: not found, trying orun.cfg
+::: not found, trying default.cfg
+*** FATAL: Could not load default.cfg. Aplication will exit now.
