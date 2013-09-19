@@ -14,10 +14,10 @@ from xml.dom import minidom
 import utm
 import re
 
-# Draw TrainLines boundaries
-vector = ".\\data\\CTARailLines.kml"
+file1 = ".\\data\\CTARailLines.kml"
 
-xmldoc = minidom.parse(vector)
+# Draw TrainLines boundaries
+xmldoc = minidom.parse(file1)
 
 itemlist = xmldoc.getElementsByTagName('Placemark')
 for node in itemlist:

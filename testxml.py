@@ -9,6 +9,9 @@ import re
 import httplib
 from random import randint
 
+file1 = "./Data/communities.kml"
+file2 = "./Data/CTARailLines.kml"
+file3 = './Data/CTA_L_Stops'
 trainRoot = SceneNode.create('trains')
 
 scene = getSceneManager()
@@ -64,9 +67,7 @@ cam.pitch(3.14159*0.45) #pitch up to start off flying over the city
 #
 ########################################################################################
 
-vector = ".\\data\\communities.kml"
-
-xmldoc = minidom.parse(vector)
+xmldoc = minidom.parse(file1)
 
 communityList = []
 itemlist = xmldoc.getElementsByTagName('description')
@@ -136,7 +137,7 @@ for node in itemlist:
 ########################################################################################
 
 # first the set of L stops
-f = open('data\\CTA_L_Stops')
+f = open(file3)
 ctastops = [line.rstrip('\n') for line in f]
 
 for name in ctastops:
@@ -151,9 +152,9 @@ f.close()
 
 
 # Draw TrainLines boundaries
-vector = ".\\data\\CTARailLines.kml"
 
-xmldoc = minidom.parse(vector)
+
+xmldoc = minidom.parse(file2)
 
 itemlist = xmldoc.getElementsByTagName('Placemark')
 for node in itemlist:
