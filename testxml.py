@@ -15,12 +15,14 @@ scene = getSceneManager()
 all = SceneNode.create("everything")
 all.addChild(trainRoot)
 
+
 ########################################################################################
 #
 # Load the yahoo map
 #
 # viewposition		== list of center point of each node
 # communityList 	== list of the name of each community
+# mapList				== dic of available map handler
 #
 ########################################################################################
 mapList = {}
@@ -34,6 +36,7 @@ city1 = StaticObject.create("map")
 city1.getMaterial().setLit(False)
 mapList.update( { 'map' : city1 })
 all.addChild(city1)
+
 # Load road map
 cityModel2 = ModelInfo()
 cityModel2.name = "sat"
@@ -43,7 +46,7 @@ city2 = StaticObject.create("sat")
 city2.getMaterial().setLit(False)
 city2.setVisible(False)
 mapList.update( { 'satellite' : city2 })
-all.addChild(city1)
+all.addChild(city2)
 
 setNearFarZ(1, 2 * city1.getBoundRadius())
 #deal with the camera
@@ -53,7 +56,6 @@ cam.setPosition(city1.getBoundCenter() + Vector3(7768.82, 2281.18, 2034.08))
 cam.getController().setSpeed(2000)
 cam.pitch(3.14159*0.45) #pitch up to start off flying over the city
 #set up the scene
-
 
 ########################################################################################
 #
@@ -129,6 +131,7 @@ for node in itemlist:
 			firstTime = True	
 	first = True
 
+
 ########################################################################################
 #
 # Draw the subway system
@@ -136,7 +139,7 @@ for node in itemlist:
 ########################################################################################
 
 # first the set of L stops
-f = open('data\\CTA_L_Stops')
+f = open('Data\\CTA_L_Stops')
 ctastops = [line.rstrip('\n') for line in f]
 
 for name in ctastops:
@@ -148,7 +151,6 @@ for name in ctastops:
 	sphere.setEffect('colored -e #ff00cc')
 	sphere.setPosition(Vector3(float(result[0]), float(result[1]), 5))
 f.close()
-
 
 # Draw TrainLines boundaries
 vector = ".\\data\\CTARailLines.kml"
@@ -179,8 +181,7 @@ for node in itemlist:
 			l.setEnd(Vector3(float(result[0]), float(result[1]), 5))
 			l.setThickness(100.0)
 		oldX = float(result[0])
-		oldY = float(result[1])		
-
+		oldY = float(result[1])
 def updateTrain():
 	global trainRoot
 	routeID = ['Red', 'Blue', 'Brn', 'G', 'Org', 'P', 'Pink', 'Y']

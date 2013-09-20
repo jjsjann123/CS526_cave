@@ -15,7 +15,7 @@ import utm
 import re
 
 # Draw TrainLines boundaries
-vector = ".\\data\\CTARailLines.kml"
+vector = ".\\Data\\CTARailLines.kml"
 
 xmldoc = minidom.parse(vector)
 
