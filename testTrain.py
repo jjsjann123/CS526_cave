@@ -3,6 +3,8 @@ from euclid import *
 from omega import *
 from cyclops import *
 
+import mysql.connector
+from mysql.connector import errorcode
 from xml.dom import minidom
 import utm
 import re
@@ -26,6 +28,8 @@ trainList = {}
 trainRoot = SceneNode.create("trainTracking")
 all.addChild(trainRoot)
 sceneLayer.update( {"trainTracking": trainRoot} )
+
+crimeList = {}
 
 updateTime = 20
 
@@ -255,13 +259,50 @@ def moveTrain(json_str):
 #
 #######################################################################################
 
+def updateCrimeScene(recordList):
+	for record in recordList:
+		posX = record['x']
+		poxY = record['y']
+		typ = record['type']
+		
+		result = utm.from_latlon(posX, poxY)
+		cube = BoxShape.create(50,50,20)
+		cube.setEffect('colored -d red')
+		pos = Vector3(float(result[0]), float(result[1]), 0)
+		cube.setPosition(pos)
+
+def updateCrimeByYear(year= None):
+	if (isMaster()):
+		hostAdd = 'localhost'
+		try:
+			cnx = mysql.connector.connect(user='view', host = hostAdd, database='crime')
+		except mysql.connector.Error as err:
+			if err.errno == errorcode.ER_ACCESS_DENIED_ERROR:
+				print("Something is wrong with your user name or password")
+			elif err.errno == errorcode.ER_BAD_DB_ERROR:
+				print("Database does not exists")
+			else:
+				print(err)
+		else:
+			dataList = []
+			cursor = cnx.cursor()
+			query = "select latitude, longitude, type, id from crimerecord where year = " + str(year) + " limit 1000"
+			cursor.execute(query)
+			rows = cursor.fetchall()
+			for (x, y, type, id) in rows:
+				#dataList.append( { 'x': float(x), 'y': float(y), 'type': str(type), 'date': str(date), 'time': str(time), 'id': int(id)} )
+				dataList.append( { 'x': float(x), 'y': float(y), 'type': str(type), 'id': int(id)} )
+			dataStr = json.dumps(dataList)
+			broadcastCommand('''updateCrimeScene(''' + dataStr + ''');''')
+			cursor.close()
+			
 #######################################################################################
 #
 # Entry Point
 #
 #######################################################################################
 			
-if (__	name__ == "__main__"):
+if ( __name__ == "__main__"):
 	initialize()
 	buildCommunity()			
 	getStation()
