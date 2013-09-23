@@ -47,6 +47,7 @@ def updateCrimeScene(recordList):
 def updateCrimeByYear(year= None):
 	if (isMaster()):
 		hostAdd = 'localhost'
+		#hostAdd = '131.193.79.42'
 		try:
 			cnx = mysql.connector.connect(user='view', host = hostAdd, database='crime')
 		except mysql.connector.Error as err:
