@@ -3,6 +3,7 @@ from euclid import *
 from omega import *
 from cyclops import *
 import sys
+import datetime
 sys.path.append('/home/evl/cs526/j_/libs')
 import mysql.connector
 from mysql.connector import errorcode
@@ -30,24 +31,19 @@ sceneLayer ={}
 sceneLayer.update( {'root': all} )
 
 trainList = {}
+trainNameList = {}
 trainRoot = SceneNode.create("trainTracking")
 all.addChild(trainRoot)
 sceneLayer.update( {"trainTracking": trainRoot} )
 
-crimeList = {}
-crimeRoot = SceneNode.create("crime")
-for i in range(1, 12):
-	crimeNode = SceneNode.create("crime" + str(i))
-	crimeRoot.addChild( crimeNode )
-
-
-updateTime = 20
+updateTrainTime = 20
+updateCrimeSimulationTime = 5
+updateCrimeTime = 3
 
 showTrainFlag = False;
 showCrimeFlag = False;
 showCommunityFlag = True;
 CrimeSimulationFlag = False;
-
 
 appMenu = None;
 communityRoot = SceneNode.create("communityRoot")
@@ -57,6 +53,32 @@ activatedCommunity = -1
 viewposition = []
 mapList = {}
 
+#crime data
+communityCodeMap = {}
+crimeList = {}
+
+#communityCrimeRoot = []
+yearCrimeRoot = {}
+yearChecked = {}
+#typeCrimeRoot = {}
+crimeRoot = SceneNode.create("crime")
+all.addChild(crimeRoot)
+yearFilter = "year like 2000"
+
+dataStream = {}
+
+hostAdd = 'localhost'
+#hostAdd = '131.193.79.42'
+
+typeFilter = {"ROBBERY": False, "BURGLARY": False, "ASSAULT": False, "HOMICIDE": False}
+typeGroup = {"ROBBERY": [], "BURGLARY": [], "ASSAULT": [], "HOMICIDE": []}
+#typeFilter = None
+crimeDataStr = None
+
+realtimeCrimeList = {}
+realtimeCrimeData = []
+whitecolor = Color('white')
+blackcolor = Color('black')
 #######################################################################################
 #
 # Callback Func
@@ -64,39 +86,129 @@ mapList = {}
 #######################################################################################
 
 def updateFunc(frame, time, dt):
-	global updateTime
-	if ( time > updateTime and showTrainFlag ):
+	global updateTrainTime
+	global updateCrimeTime
+	global showTrainFlag
+	global showCrimeFlag
+	global CrimeSimulationFlag
+	global updateCrimeSimulationTime
+	if ( time > updateTrainTime and showTrainFlag ):
 		updateTrain()
 		print "updateTrain"
-		updateTime = time + 20
+		updateTrainTime = time + 20
+	if ( time >  updateCrimeTime and showCrimeFlag ):
+		loadData()
+		print "loadingCrime"
+		updateCrimeTime = time+3
+	if ( time > updateCrimeSimulationTime and CrimeSimulationFlag):
+		realtimeUpdate()
+		updateCrimeSimulationTime = time + 15
+
+def onDraw(displaySize, tileSize, camera, painter):
+	global CrimeSimulationFlag
+	global realtimeCrimeData
+	global whitecolor
+	global blackcolor
+	global communityCodeMap
+	if (CrimeSimulationFlag == False or realtimeCrimeData == []):
+		return 0
+	# Get the default font
+	font = painter.getDefaultFont()
+	accPos = Vector2(10, 10)
+	
+	#print "oh"
+	for q in realtimeCrimeData:
+	# Set some text and compute its width and height in pixels (given the font we cant to use)
+		comm = communityCodeMap.get(str(q['community']) )
+		if (comm != None):
+			text = "type " + (str(q['type'])) + " " + (str(q['id'])) + "  time: " + (str(q['time']) ) +"  "+ (str(comm))
+		else:
+			text = "type " + (str(q['type'])) + " " + (str(q['id'])) + "  time: " + (str(q['time']) ) + "  Community_Code" + (str(q['community']) )
+		textSize = font.computeSize(text)
+		# Draw a white box and put the text inside it
+		painter.drawRect(accPos, textSize + Vector2(10, 10), whitecolor)
+		painter.drawText(text, font, accPos + Vector2(5, 5 ), TextAlign.HALeft | TextAlign.VATop, blackcolor)
+		accPos += Vector2(0, textSize.y+12)
 
 def onEvent():
 	global appMenu
+	cam = getDefaultCamera()
 	e = getEvent()
-	if(e.getServiceType() == ServiceType.Pointer or e.getServiceType() == ServiceType.Wand or e.getServiceType() == ServiceType.Keyboard):
+	type = e.getServiceType()
+	if(type == ServiceType.Pointer or type == ServiceType.Wand or type == ServiceType.Keyboard):
 		# Button mappings are different when using wand or mouse
 		confirmButton = EventFlags.Button2
 		quitButton = EventFlags.Button1
-		if(e.getServiceType() == ServiceType.Wand): 
+
+		lowHigh = 0
+		leftRight = 0
+		if(type == ServiceType.Keyboard):
+			forward = ord('w')
+			down = ord('s')
+			left = ord ('a')
+			right = ord('d')
+			low = ord('i')
+			high = ord('k')
+			turnleft = ord('j')
+			turnright = ord('l')
+			climb = ord('r')
+			descend = ord('f')
+			if(e.isKeyDown( low)):
+				lowHigh = 0.5
+			if(e.isKeyDown( high )):
+				lowHigh = -0.5
+			if(e.isKeyDown( turnleft)):
+				leftRight = 0.5
+			if(e.isKeyDown( turnright )):
+				leftRight = -0.5				
+			if(e.isKeyDown( forward)):
+				cam.translate(0, 0, -500, Space.Local )
+			if(e.isKeyDown( down )):
+				cam.translate(0, 0, 500, Space.Local )
+			if(e.isKeyDown( left)):
+				cam.translate(-500, 0, 0, Space.Local )
+			if(e.isKeyDown( right )):
+				cam.translate(500, 0, 0, Space.Local )
+			if(e.isKeyDown( climb)):
+				cam.translate(0, 500, 0, Space.Local )
+			if(e.isKeyDown( descend )):
+				cam.translate(0, -500, 0, Space.Local )
+		
+		if(type == ServiceType.Wand): 
 			confirmButton = EventFlags.Button5
 			quitButton = EventFlags.Button3
-
-		if(e.getServiceType() == ServiceType.Keyboard):
-			print "key"
-		
+			forward = EventFlags.ButtonUp
+			down = EventFlags.ButtonDown
+			left = EventFlags.ButtonLeft
+			right = EventFlags.ButtonRight
+			climb = EventFlags.Button5
+			descend = EventFlags.Button7
+			lowHigh = e.getAxis(0)
+			leftRight = e.getAxis(1)
+			if(e.isButtonDown( forward)):
+				cam.translate(0, 0, -500, Space.Local )
+			if(e.isButtonDown( down )):
+				cam.translate(0, 0, 500, Space.Local )
+			if(e.isButtonDown( left)):
+				cam.translate(-500, 0, 0, Space.Local )
+			if(e.isButtonDown( right )):
+				cam.translate(500, 0, 0, Space.Local )
+			if(e.isButtonDown( climb)):
+				cam.translate(0, 500, 0, Space.Local )
+			if(e.isButtonDown( descend )):
+				cam.translate(0, -500, 0, Space.Local )
+	
+		cam.rotate(Vector3(1,0,0), -lowHigh, Space.Local)
+		cam.rotate(Vector3(0,0,1), leftRight, Space.Local)
+				
 		# When the confirm button is pressed:
 		if(e.isButtonDown(confirmButton)):
-			print "confirm1"
 			appMenu.getContainer().setPosition(e.getPosition())
 			appMenu.show()
 		if(e.isButtonDown(quitButton)):
-			print "confirm2"
 			appMenu.hide()
-		
-		
-			
-	
-			
+		e.setProcessed()
+
 def toggleMap(map):
 	global mapList
 	global appMenu
@@ -131,13 +243,31 @@ def toggleTrain():
 	showTrainFlag = not showTrainFlag
 	trainRoot.setChildrenVisible(showTrainFlag)
 
-def toggleCrime():
+def toggleUpdateCrime():
 	global showCrimeFlag
 	global crimeRoot
 	global appMenu
 	appMenu.hide()
 	showCrimeFlag = not showCrimeFlag
-	crimeRoot.setChildrenVisible(showCrimeFlag)
+
+def toggleShowCrime(year):
+	global yearCrimeRoot
+	global yearChecked
+	global yearFilter
+	yearCrimeRoot[year].setChildrenVisible(yearChecked[year])
+	yearChecked[year] = not yearChecked[year]
+	yearFilter = yearFilter.replace(' or year like '+ str(year),'')
+	if (yearChecked[year] == True):
+		yearFilter += ' or year like '
+		yearFilter += str(year)
+
+def toggleShowCrimeType(type):
+	global typeFilter
+	global typeGroup
+	typeFilter[type] = not typeFilter[type]
+	for item in typeGroup[type]:
+		item.setVisibility = typeFilter[type]
+		
 
 def toggleCommunity():
 	global communityRoot
@@ -146,6 +276,16 @@ def toggleCommunity():
 	appMenu.hide()
 	showCommunityFlag = not showCommunityFlag
 	communityRoot.setChildrenVisible(showCommunityFlag)
+
+def realTimeCrime():
+	global showCrimeFlag
+	global CrimeSimulationFlag
+	global crimeList
+	CrimeSimulationFlag = not CrimeSimulationFlag
+	if (CrimeSimulationFlag):
+		for key in crimeList:
+			crimeList[key].setVisible(False)
+		showCrimeFlag = False
 
 #######################################################################################
 #
@@ -158,6 +298,11 @@ def toggleCommunity():
 #######################################################################################
 def initialize():
 	global mapList
+	global yearCrimeRoot
+	global yearChecked
+	global typeCrimeRoot
+	global crimeRoot
+	global dataStream
 	# Load satelite map
 	cityModel1 = ModelInfo()
 	cityModel1.name = "map"
@@ -186,11 +331,23 @@ def initialize():
 	#cam.setPosition(city1.getBoundCenter() )
 	cam.getController().setSpeed(2000)
 	cam.pitch(3.14159*0.45) #pitch up to start off flying over the city
+	cam.setControllerEnabled(False)
 	#set up the scene
 	light = Light.create()
 	light.setColor(Color('white'))
+	light.setLightType(LightType.Directional)
+	light.setLightDirection(Vector3(0,0, 20))
 	light.setEnabled(True)
-
+	
+	#load community code => name
+	for i in range(1, 13):
+		yearCrimeRoot[2000+i] = SceneNode.create("crime20" + str(i))
+		crimeRoot.addChild( yearCrimeRoot[2000+i] )
+		yearChecked[2000+i] = False
+		dataStream.update({ (2000+i): None})
+	#for q in ('ROBBERY', 'BURGLARY', 'ASSAULT', 'HOMICIDE'):
+	#	typeCrimeRoot[q] = SceneNode.create(q+"Root")
+	#	crimeRoot.addChild( typeCrimeRoot[q] )
 	
 def buildGUI():
 	global mapList
@@ -243,14 +400,31 @@ def buildGUI():
 	button1 = subMenu.addButton("updateTrain", "toggleTrain()").getButton()
 	button1.setCheckable(True)
 	button1.setChecked(False)
-	button2 = subMenu.addButton("updateCrime", "toggleCrime()").getButton()
+	button2 = subMenu.addButton("updateCrime", "toggleUpdateCrime()").getButton()
 	button2.setCheckable(True)
 	button2.setChecked(False)
 	button3 = subMenu.addButton("showCommunity", "toggleCommunity()").getButton()
 	button3.setCheckable(True)
 	button3.setChecked(True)
+
+	subMenu = appMenu.addSubMenu("filterCrime")
+	for integer in range (2001,2012):
+		button = subMenu.addButton("Filter Crime Year " + str(integer), "toggleShowCrime(" + str(integer) + ")").getButton()
+		button.setCheckable(True)
+		button.setChecked(False)
 	
+	for type in ( 'ROBBERY', 'BURGLARY', 'ASSAULT', 'HOMICIDE'):
+		button = subMenu.addButton("Filter Crime Type" + str(type), "toggleShowCrimeType('" + str(type) + "')").getButton()
+		button.setCheckable(True)
+		button.setChecked(False)
 	
+	button = subMenu.addButton("reset Crime Update", 'updateCrime()')
+	
+	#button = appMenu.addButton("real-time Hero play", 'realTimeCrime(); button2.setChecked(False);').getButton()
+	button = appMenu.addButton("real-time Hero play", 'realTimeCrime()').getButton()
+	button.setCheckable(True)
+	button.setChecked(False)
+	button.setChecked(False)
 	
 ########################################################################################
 #
@@ -264,6 +438,19 @@ def buildCommunity():
 	global communityList
 	global viewposition
 	global communityRoot
+	global communityCodeMap
+	vector = "Data/crime/communityCode.csv"
+	f = open(vector)
+	comMap = [line.rstrip('\n') for line in f]
+
+	for line in comMap:
+		bar = line.split(',')
+		p1 = bar[0].strip(' ')
+		p2 = bar[1].strip(' ')
+		communityCodeMap.update({p1 : p2})
+	f.close()
+	
+	
 	vector = "Data/communities.kml"
 
 	xmldoc = minidom.parse(vector)
@@ -352,13 +539,13 @@ def getStation():
 		if (name == ''): continue
 		bar = name.split(',')
 		result = utm.from_latlon(float(bar[1]), float(bar[2]))
-		cube = BoxShape.create(50,50,20)
-		cube.setEffect('colored -d #ff00cc')
+		cube = BoxShape.create(80,80,40)
+		cube.setEffect('colored -d #e67e22')
 		pos = Vector3(float(result[0]), float(result[1]), 0)
 		cube.setPosition(pos)
 		t = Text3D.create('fonts/arial.ttf', 100, bar[0])
 		t.setPosition( Vector3(0,0,100) + pos)
-		t.setColor(Color('#dd0033'))
+		t.setColor(Color('#e74c3c'))
 		stationRoot.addChild(cube)
 		stationLabel.addChild(t)
 	f.close()
@@ -425,15 +612,23 @@ def moveTrain(json_str):
 	trainRoot.setChildrenVisible(False)
 	for record in json_str:
 		train = trainList.get(record['id'])
+		trainName = trainNameList.get(record['id'])
 		if ( train == None):
 			sphere = SphereShape.create(30, 4)
 			sphere.setPosition(record['x'], record['y'], record['z'])
 			sphere.setEffect("colored -d " + record['color'])
+			t = Text3D.create('fonts/arial.ttf', 100, str(int(record['id'])))
+			t.setPosition(record['x'], record['y'], record['z']+50)
+			t.setColor(Color(record['color']))
 			trainList.update({ record['id']: sphere })
+			trainNameList.update({ record['id']: t })
 			trainRoot.addChild(sphere)
+			trainRoot.addChild(t)
 		else:
 			train.setPosition(record['x'], record['y'], record['z'])
+			trainName.setPosition(record['x'], record['y'], record['z']+50)
 			train.setVisible(True)
+			trainName.setVisible(True)
 			
 			
 #######################################################################################
@@ -441,33 +636,62 @@ def moveTrain(json_str):
 # Crime
 #
 #######################################################################################
-def updateCrimeScene(recordList):
-	global crimeRoot
-	count = 2000
-	for record in recordList:
+def updateCrimeScene(recordList, para):
+	global crimeDataStr
+	global dataStream
+	crimeDataStr += recordList
+	for i in range (2001, 2013):
+		if str(i) in para: 
+			if (dataStream[i] == None or len(dataStream[i] > len(recordList))):
+				dataStream[i] = recordList
+	
+def loadData():
+	global crimeDataStr
+	global crimeList
+	global typeFilter
+	global typeGroup
+	if (crimeDataStr == None):
+		return 0
+	#global crimeRoot
+	global yearCrimeRoot
+	#global typeCrimeRoot
+	count = 300
+	for record in crimeDataStr:
 		id = record['id']
 		item = crimeList.get(id)
+		type = record['type']
 		if (item == None):
 			posX = record['x']
 			poxY = record['y']
-			typ = record['type']
 			year = record['year']
 			result = utm.from_latlon(posX, poxY)
-			cube = BoxShape.create(50,50,20)
-			cube.setEffect('colored -d red')
-			pos = Vector3(float(result[0]), float(result[1]), 0)
+			cube = PlaneShape.create(50,50)
+			if ( type == "ROBBERY"):
+				cube.setEffect('colored -d green')
+			if ( type == "BURGLARY"):
+				cube.setEffect('colored -d yellow')
+			if ( type == "ASSAULT"):
+				cube.setEffect('colored -d blue')
+			if ( type == "HOMICIDE"):
+				cube.setEffect('colored -d red')
+			pos = Vector3(float(result[0]), float(result[1]), 1)
 			cube.setPosition(pos)
-			crimeRoot.getChildByIndex(year-2001).addChild(cube)
+			yearCrimeRoot[year].addChild(cube)
+			#typeCrimeRoot[type].addChild(cube)
 			crimeList.update( {id: cube} )
+			typeGroup[type].append(cube)
 			count-=1
 			if (count == 0) : break
-		else:
-			item.setVisible(True);
-
-def updateCrimeByYear(year= None):
+			item = cube
+		item.setVisible(typeFilter[type]);
+		
+			
+def updateCrime(year= None, type= None, community= None):
 	if (isMaster()):
-		hostAdd = 'localhost'
-		#hostAdd = '131.193.79.42'
+		global crimeDataStr
+		global yearFilter
+		crimeDataStr = []
+		global hostAdd
 		try:
 			cnx = mysql.connector.connect(user='view', host = hostAdd, database='crime')
 		except mysql.connector.Error as err:
@@ -480,15 +704,104 @@ def updateCrimeByYear(year= None):
 		else:
 			dataList = []
 			cursor = cnx.cursor()
-			query = "select latitude, longitude, type, year, id from crimerecord where year = " + str(year)
+			if (year== None): searchYear = yearFilter
+			if (type== None): type = '%'
+			if (community== None): community = '%'
+			for i in range (2001, 2013):
+				if (dataStream[i] != None):
+					searchYear = searchYear.replace (' or year like '+ str(i),'')
+					crimeDataStr += dataStream[i]
+			#query = "select latitude, longitude, type, year, id from crimerecord where year like " + str(year) + " AND type like '" + str(type) + "' AND community like '" +str(community) + "';"
+			query = "select latitude, longitude, type, year, id from crimerecord where " + str(searchYear) + " AND type like '" + str(type) + "' AND community like '" +str(community) + "';"
+			print query
 			cursor.execute(query)
 			rows = cursor.fetchall()
 			for (x, y, type, year, id) in rows:
 				#dataList.append( { 'x': float(x), 'y': float(y), 'type': str(type), 'date': str(date), 'time': str(time), 'id': int(id)} )
 				dataList.append( { 'x': float(x), 'y': float(y), 'type': str(type), 'year': int(year), 'id': int(id)} )
 			dataStr = json.dumps(dataList)
-			broadcastCommand('''updateCrimeScene(''' + dataStr + ''');''')
+			broadcastCommand('updateCrimeScene(' + dataStr + ',"' + str(searchYear) + '",);')
 			cursor.close()
+
+def realtimeUpdate ( ):
+	if (isMaster()):
+		global hostAdd
+		try:
+			cnx = mysql.connector.connect(user='view', host = hostAdd, database='crime')
+		except mysql.connector.Error as err:
+			if err.errno == errorcode.ER_ACCESS_DENIED_ERROR:
+				print("Something is wrong with your user name or password")
+			elif err.errno == errorcode.ER_BAD_DB_ERROR:
+				print("Database does not exists")
+			else:
+				print(err)
+		else:
+			dataList = []
+			cursor = cnx.cursor()
+			date = str( datetime.datetime.now().date() )
+			date = list(date)
+			date[3] = '%'
+			date = ''.join(date)
+			
+			time = datetime.datetime.now()
+			starttime = (str((time - datetime.timedelta(seconds=900)).time()))[:8]
+			time = (str(time.time()))[:8]
+			
+			query = ("select latitude, longitude, type, year, time, id, community from crimerecord where " 
+			"date like '" + date + "' and time between '"+ starttime +"' and '"+ time +"'")
+			print query
+			cursor.execute(query)
+			rows = cursor.fetchall()
+			for (x, y, type, year, time, id, community) in rows:
+				#dataList.append( { 'x': float(x), 'y': float(y), 'type': str(type), 'date': str(date), 'time': str(time), 'id': int(id)} )
+				dataList.append( { 'x': float(x), 'y': float(y), 'type': str(type), 'year': int(year), 'id': int(id), 'time': str(time), 'community': str(community)} )
+			dataStr = json.dumps(dataList)
+			broadcastCommand('realTime(' + dataStr + ')')
+			cursor.close()
+			
+def realTime(str):
+	global crimeList
+	global realtimeCrimeList
+	global typeGroup
+	global yearCrimeRoot
+	global realtimeCrimeData
+	#global typeFilter
+	if (str == []):
+		return 0
+	for record in realtimeCrimeList:
+		realtimeCrimeList[record].setVisible(False)
+	realtimeCrimeData = []
+	realtimeCrimeList = {}
+	for record in str:
+		id = record['id']
+		item = crimeList.get(id)
+		type = record['type']
+		realtimeCrimeData.append(record)
+		if (item == None):
+			posX = record['x']
+			poxY = record['y']
+			year = record['year']
+			result = utm.from_latlon(posX, poxY)
+			cube = PlaneShape.create(50,50)
+			if ( type == "ROBBERY"):
+				cube.setEffect('colored -d green')
+			if ( type == "BURGLARY"):
+				cube.setEffect('colored -d yellow')
+			if ( type == "ASSAULT"):
+				cube.setEffect('colored -d blue')
+			if ( type == "HOMICIDE"):
+				cube.setEffect('colored -d red')
+			pos = Vector3(float(result[0]), float(result[1]), 1)
+			cube.setPosition(pos)
+			yearCrimeRoot[year].addChild(cube)
+			#typeCrimeRoot[type].addChild(cube)
+			crimeList.update( {id: cube} )
+			realtimeCrimeList.update( {id: cube} )
+			typeGroup[type].append(cube)
+			item = cube
+		#item.setVisible(typeFilter[type])
+		item.setVisible(True)
+	
 #######################################################################################
 #
 # Entry Point
@@ -505,6 +818,7 @@ if ( __name__ == "__main__"):
 	
 	setUpdateFunction(updateFunc)
 	setEventFunction(onEvent)
+	setDrawFunction(onDraw)
 	#print "yes"
 
 
