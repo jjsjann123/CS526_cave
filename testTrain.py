@@ -22,6 +22,10 @@ from random import randint
 scene = getSceneManager()
 all = SceneNode.create("everything")
 
+#skybox = Skybox()
+#skybox.loadCubeMap("./Data/sky", "png")
+#scene.setSkyBox(skybox)
+
 sceneLayer ={}
 sceneLayer.update( {'root': all} )
 
@@ -39,12 +43,19 @@ for i in range(1, 12):
 
 updateTime = 20
 
-showTrainFlag = True;
-showRouteFlag = True;
-showStationFlag = True;
-showMapFlag = 0;
-showCrimeFlag = True;
+showTrainFlag = False;
+showCrimeFlag = False;
+showCommunityFlag = True;
 CrimeSimulationFlag = False;
+
+
+appMenu = None;
+communityRoot = SceneNode.create("communityRoot")
+all.addChild(communityRoot)
+communityList = []
+activatedCommunity = -1
+viewposition = []
+mapList = {}
 
 #######################################################################################
 #
@@ -54,51 +65,87 @@ CrimeSimulationFlag = False;
 
 def updateFunc(frame, time, dt):
 	global updateTime
-	if ( time > updateTime ):
+	if ( time > updateTime and showTrainFlag ):
 		updateTrain()
 		print "updateTrain"
 		updateTime = time + 20
+
+def onEvent():
+	global appMenu
+	e = getEvent()
+	if(e.getServiceType() == ServiceType.Pointer or e.getServiceType() == ServiceType.Wand or e.getServiceType() == ServiceType.Keyboard):
+		# Button mappings are different when using wand or mouse
+		confirmButton = EventFlags.Button2
+		quitButton = EventFlags.Button1
+		if(e.getServiceType() == ServiceType.Wand): 
+			confirmButton = EventFlags.Button5
+			quitButton = EventFlags.Button3
+
+		if(e.getServiceType() == ServiceType.Keyboard):
+			print "key"
 		
-########################################################################################
-#
-# Load the yahoo map
-#
-# viewposition		== list of center point of each node
-# communityList 	== list of the name of each community
-# mapList				== dic of available map handler
-#
-########################################################################################
-mapList = {}
+		# When the confirm button is pressed:
+		if(e.isButtonDown(confirmButton)):
+			print "confirm1"
+			appMenu.getContainer().setPosition(e.getPosition())
+			appMenu.show()
+		if(e.isButtonDown(quitButton)):
+			print "confirm2"
+			appMenu.hide()
+		
+		
+			
+	
+			
+def toggleMap(map):
+	global mapList
+	global appMenu
+	appMenu.hide()
+	for node in mapList:
+		if ( node == map ):
+			mapList[node].setVisible(True)
+		else:
+			mapList[node].setVisible(False)
 
-# Load satelite map
-cityModel1 = ModelInfo()
-cityModel1.name = "map"
-cityModel1.path = "chicago_yahoo.earth"
-scene.loadModel(cityModel1)
-city1 = StaticObject.create("map")
-city1.getMaterial().setLit(False)
-mapList.update( { 'map' : city1 })
-all.addChild(city1)
+def switchCommunity(index):
+	global viewposition
+	global communityRoot
+	global activatedCommunity
+	global appMenu
+	appMenu.hide()
+	activatedCommunity = index
+	if ( index >= 0 ):
+		cam = getDefaultCamera()
+		cam.setPosition( viewposition[index] + Vector3(0, 0, 6000) )
+		cam.setPitchYawRoll (Vector3(0,0,0))
+	else:
+		cam = getDefaultCamera()
+		cam.setPosition( Vector3(439418.67, 4631157.25, -752.96) + Vector3(0, 0, 40000) )
+		cam.setPitchYawRoll (Vector3(0,0,0))		
+	
+def toggleTrain():
+	global showTrainFlag
+	global trainRoot
+	global appMenu
+	appMenu.hide()
+	showTrainFlag = not showTrainFlag
+	trainRoot.setChildrenVisible(showTrainFlag)
 
-# Load road map
-cityModel2 = ModelInfo()
-cityModel2.name = "sat"
-cityModel2.path = "chicago_yahoo_sat.earth"
-scene.loadModel(cityModel2)
-city2 = StaticObject.create("sat")
-city2.getMaterial().setLit(False)
-city2.setVisible(False)
-mapList.update( { 'satellite' : city2 })
-all.addChild(city2)
+def toggleCrime():
+	global showCrimeFlag
+	global crimeRoot
+	global appMenu
+	appMenu.hide()
+	showCrimeFlag = not showCrimeFlag
+	crimeRoot.setChildrenVisible(showCrimeFlag)
 
-setNearFarZ(1, 2 * city1.getBoundRadius())
-#deal with the camera
-cam = getDefaultCamera()
-cam.setPosition(city1.getBoundCenter() + Vector3(7768.82, 2281.18, 2034.08))
-#cam.setPosition(city1.getBoundCenter() )
-cam.getController().setSpeed(2000)
-cam.pitch(3.14159*0.45) #pitch up to start off flying over the city
-#set up the scene
+def toggleCommunity():
+	global communityRoot
+	global showCommunityFlag
+	global appMenu
+	appMenu.hide()
+	showCommunityFlag = not showCommunityFlag
+	communityRoot.setChildrenVisible(showCommunityFlag)
 
 #######################################################################################
 #
@@ -106,30 +153,105 @@ cam.pitch(3.14159*0.45) #pitch up to start off flying over the city
 #
 # GUI shoul be put here too
 #
+# mapList == dic of available map handler
+#
 #######################################################################################
 def initialize():
-	setNearFarZ(1, 2 * 23227.75)
+	global mapList
+	# Load satelite map
+	cityModel1 = ModelInfo()
+	cityModel1.name = "map"
+	cityModel1.path = "chicago_yahoo.earth"
+	scene.loadModel(cityModel1)
+	city1 = StaticObject.create("map")
+	city1.getMaterial().setLit(False)
+	mapList.update( { 'map' : city1 })
+	all.addChild(city1)
+
+	# Load road map
+	cityModel2 = ModelInfo()
+	cityModel2.name = "sat"
+	cityModel2.path = "chicago_yahoo_sat.earth"
+	scene.loadModel(cityModel2)
+	city2 = StaticObject.create("sat")
+	city2.getMaterial().setLit(False)
+	city2.setVisible(False)
+	mapList.update( { 'satellite' : city2 })
+	all.addChild(city2)
+
+	setNearFarZ(1, 2 * city1.getBoundRadius())
 	#deal with the camera
 	cam = getDefaultCamera()
-	cam.setPosition(Vector3(439418.67, 4631157.25, -752.96) + Vector3(7768.82, 2281.18, 2034.08))
+	cam.setPosition(city1.getBoundCenter() + Vector3(7768.82, 2281.18, 2034.08))
 	#cam.setPosition(city1.getBoundCenter() )
 	cam.getController().setSpeed(2000)
 	cam.pitch(3.14159*0.45) #pitch up to start off flying over the city
 	#set up the scene
-
 	light = Light.create()
 	light.setColor(Color('white'))
 	light.setEnabled(True)
+
 	
 def buildGUI():
-	menu = MenuManager.createAndInitialize()
+	global mapList
+	global appMenu
+	mm = MenuManager.createAndInitialize()
 	appMenu = mm.createMenu("contolPanel")
+	
+	appMenu.addButton("OverView", "switchCommunity(-1)")
 
-	appMenu.addButton("toggle", "toggleCamera()")
-	appMenu.addButton("toggle2", "toggleCamera()")
-	appMenu.addButton("toggle3", "toggleCamera()")
-
-
+	# map toggle
+	subMenu = appMenu.addSubMenu('Map')
+	first = True
+	for map in mapList:
+		button = subMenu.addButton(map,"toggleMap('" + map + "')").getButton()
+		button.setRadio(True)
+		button.setCheckable(True)
+		button.setChecked(first)
+		first = False
+	button = subMenu.addButton('None', "toggleMap('')").getButton()
+	button.setRadio(True)
+	button.setCheckable(True)
+	button.setChecked(False)
+	
+	# community information
+	subMenu = appMenu.addSubMenu('Community')
+	col = 6
+	containerList = []
+	cc = subMenu.getContainer()
+	cc.setLayout(ContainerLayout.LayoutHorizontal)
+	for i in range(0,col):
+		containerList.append(Container.create(ContainerLayout.LayoutVertical,cc))
+	index = 0
+	prevButton = None
+	for com in communityList:
+		button = Button.create(containerList[index%6])
+		button.setText(com)
+		button.setUIEventCommand('switchCommunity(' + str(index) + ')' )
+		#button.setCommand('print "' + com + '"')
+		#button.setRadio(True)
+		#button.setCheckable(True)
+		#button.setChecked(True)
+		if (index % 6 != 0):
+			prevButton.setHorizontalNextWidget(button)
+			button.setHorizontalPrevWidget(prevButton)
+		prevButton = button
+		index+=1
+		
+	# option
+	subMenu = appMenu.addSubMenu("options")
+	button1 = subMenu.addButton("updateTrain", "toggleTrain()").getButton()
+	button1.setCheckable(True)
+	button1.setChecked(False)
+	button2 = subMenu.addButton("updateCrime", "toggleCrime()").getButton()
+	button2.setCheckable(True)
+	button2.setChecked(False)
+	button3 = subMenu.addButton("showCommunity", "toggleCommunity()").getButton()
+	button3.setCheckable(True)
+	button3.setChecked(True)
+	
+	
+	
 ########################################################################################
 #
 # Draw the district boundaries
@@ -139,11 +261,13 @@ def buildGUI():
 #
 ########################################################################################
 def buildCommunity():
+	global communityList
+	global viewposition
+	global communityRoot
 	vector = "Data/communities.kml"
 
 	xmldoc = minidom.parse(vector)
 
-	communityList = []
 	itemlist = xmldoc.getElementsByTagName('description')
 	for node in itemlist:
 		str = node.firstChild.data.encode('ascii', 'ignore')
@@ -154,14 +278,15 @@ def buildCommunity():
 				tag = xml.getElementsByTagName('span')
 				communityList.append(tag[1].firstChild.data.encode('ascii', 'ignore'))
 				break
-
-	viewposition = []
 	index = 0
 	itemlist = xmldoc.getElementsByTagName('MultiGeometry') 
 	for node in itemlist:
-		r = randint(0,255)
-		g = randint(0,255)
-		b = randint(0,255)
+		#r = randint(0,255)
+		#g = randint(0,255)
+		#b = randint(0,255)
+		r = 180
+		g = 180
+		b = 180
 		color = Color(r/255.0, g/255.0, b/255.0, 1)
 		coord = node.getElementsByTagName('coordinates')
 		first = True
@@ -177,6 +302,8 @@ def buildCommunity():
 				t.setColor( color )
 				districtBound = LineSet.create()
 				districtBound.setEffect('colored -e #' + hex(r)[2:] + hex(g)[2:] + hex(b)[2:] + 'dd -t')
+				communityRoot.addChild(districtBound)
+				communityRoot.addChild(t)
 				l = districtBound.addLine()
 				l.setStart(viewposition[index])
 				l.setEnd(viewposition[index] + Vector3(0,0,300))
@@ -339,8 +466,8 @@ def updateCrimeScene(recordList):
 
 def updateCrimeByYear(year= None):
 	if (isMaster()):
-		#hostAdd = 'localhost'
-		hostAdd = '131.193.79.42'
+		hostAdd = 'localhost'
+		#hostAdd = '131.193.79.42'
 		try:
 			cnx = mysql.connector.connect(user='view', host = hostAdd, database='crime')
 		except mysql.connector.Error as err:
@@ -373,9 +500,12 @@ if ( __name__ == "__main__"):
 	buildCommunity()			
 	getStation()
 	getRoute()
-	updateTrain()
+	buildGUI()
+	#updateTrain()
 	
 	setUpdateFunction(updateFunc)
+	setEventFunction(onEvent)
+	#print "yes"
 
 
 	
